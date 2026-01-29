@@ -2,6 +2,7 @@ using Amazon.Lambda.APIGatewayEvents;
 using Amazon.Lambda.Core;
 using Amazon.DynamoDBv2;
 using AddressToCoordinatesLambda.Infrastructure;
+using System.Text.Json;
 
 [assembly: LambdaSerializer(typeof(Amazon.Lambda.Serialization.SystemTextJson.DefaultLambdaJsonSerializer))]
 
@@ -39,18 +40,36 @@ namespace AddressToCoordinatesLambda
             var cached = await cacheRepository.GetAsync(address);
             if (cached != null)
             {
-                context.Logger.LogLine("Returned from cache");
-                return JsonResponse(200, cached);
+                var cachedCoordinates = JsonSerializer.Deserialize<CoordinatesDto>(cached)
+                    ?? throw new Exception("Cached coordinates are null");
+
+                var resultFromCache = new
+                {
+                    lat = cachedCoordinates.Lat,
+                    lng = cachedCoordinates.Lng,
+                    source = "cache"
+                };
+
+                return JsonResponse(200, JsonSerializer.Serialize(resultFromCache));
             }
 
             // Google API
-            var googleJson = await geocodeClient.GetGeocodeRawAsync(address);
+            var coordinates = await geocodeClient.GetCoordinatesAsync(address);
+
+            var jsonResult = JsonSerializer.Serialize(coordinates);
 
             // Save cache (30 days)
-            await cacheRepository.SaveAsync(address, googleJson, ttlDays: 30);
+            await cacheRepository.SaveAsync(address, jsonResult, ttlDays: 30);
 
-            //  Return
-            return JsonResponse(200, googleJson);
+            // Return
+            var result = new
+            {
+                lat = coordinates.Lat,
+                lng = coordinates.Lng,
+                source = "google"
+            };
+
+            return JsonResponse(200, JsonSerializer.Serialize(result));
         }
 
         /* ===== Helpers ===== */

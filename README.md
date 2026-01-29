@@ -1,189 +1,49 @@
-# Address to Coordinates – AWS Lambda with Google Geocoding Cache
+# AWS Lambda Empty Function Project
 
-## Overview
+This starter project consists of:
+* Function.cs - class file containing a class with a single function handler method
+* aws-lambda-tools-defaults.json - default argument settings for use with Visual Studio and command line deployment tools for AWS
 
-This project implements an **enterprise‑ready, serverless geocoding service** using **AWS Lambda (.NET 7)**, **Amazon API Gateway**, **Amazon DynamoDB**, and the **Google Geocoding API**.
+You may also have a test project depending on the options selected.
 
-The Lambda function exposes a simple HTTP GET endpoint that:
+The generated function handler is a simple method accepting a string argument that returns the uppercase equivalent of the input string. Replace the body of this method, and parameters, to suit your needs. 
 
-1. Receives a U.S. address as a query parameter.
-2. Checks DynamoDB for a cached Google Geocoding response.
-3. Returns the cached response if it exists and is still valid (30‑day TTL).
-4. Otherwise, calls the Google Geocoding API, stores the full response in DynamoDB, and returns it.
+## Here are some steps to follow from Visual Studio:
 
-The goal of this exercise is not only functionality, but **clean architecture, separation of concerns, and production‑grade design decisions**.
+To deploy your function to AWS Lambda, right click the project in Solution Explorer and select *Publish to AWS Lambda*.
 
----
+To view your deployed function open its Function View window by double-clicking the function name shown beneath the AWS Lambda node in the AWS Explorer tree.
 
-## High‑Level Architecture
+To perform testing against your deployed function use the Test Invoke tab in the opened Function View window.
 
+To configure event sources for your deployed function, for example to have your function invoked when an object is created in an Amazon S3 bucket, use the Event Sources tab in the opened Function View window.
+
+To update the runtime configuration of your deployed function use the Configuration tab in the opened Function View window.
+
+To view execution logs of invocations of your function use the Logs tab in the opened Function View window.
+
+## Here are some steps to follow to get started from the command line:
+
+Once you have edited your template and code you can deploy your application using the [Amazon.Lambda.Tools Global Tool](https://github.com/aws/aws-extensions-for-dotnet-cli#aws-lambda-amazonlambdatools) from the command line.
+
+Install Amazon.Lambda.Tools Global Tools if not already installed.
 ```
-Client
-  ↓
-API Gateway (HTTP GET /geocode)
-  ↓
-AWS Lambda (.NET 7)
-  ├── Cache hit → DynamoDB
-  └── Cache miss → Google Geocoding API → DynamoDB
-```
-
-### Key Design Decisions
-
-* **Serverless-first**: No servers to manage, scales automatically.
-* **Cache-aside pattern** using DynamoDB.
-* **Full Google API response stored**, not partial data.
-* **TTL-based cache expiration** (30 days) enforced by DynamoDB.
-* **Clear separation of responsibilities** (Function, Repository, External Client).
-
----
-
-## API Usage
-
-### Endpoint
-
-```
-GET /geocode?address={US_ADDRESS}
+    dotnet tool install -g Amazon.Lambda.Tools
 ```
 
-### Example Request
-
+If already installed check if new version is available.
 ```
-https://djs6l6d7xf.execute-api.us-east-1.amazonaws.com/geocode?address=400+Broad+St,+Seattle,+WA+98109
-```
-
-### Example Response (Google API – full payload)
-
-```json
-{
-  "results": [...],
-  "status": "OK"
-}
+    dotnet tool update -g Amazon.Lambda.Tools
 ```
 
-### Cache Behavior
-
-* **First request** → Calls Google API → Stores response in DynamoDB
-* **Subsequent requests (within 30 days)** → Returned directly from DynamoDB
-* DynamoDB TTL attribute automatically expires cached entries
-
----
-
-## DynamoDB Schema
-
-| Attribute      | Type   | Description                             |
-| -------------- | ------ | --------------------------------------- |
-| `address`      | String | Partition key (US address)              |
-| `responseJson` | String | Full Google Geocoding API JSON response |
-| `expiresAt`    | Number | Unix timestamp (TTL, 30 days)           |
-
-TTL is enabled on `expiresAt`.
-
----
-
-## Project Structure
-
+Execute unit tests
 ```
-src/
- ├── Function.cs
- ├── GeocodeCacheRepository.cs
- ├── GoogleGeocodeClient.cs
- ├── AddressToCoordinatesLambda.csproj
- ├── aws-lambda-tools-defaults.json
- ├── payload.json
- └── README.md
+    cd "AddressToCoordinatesLambda/test/AddressToCoordinatesLambda.Tests"
+    dotnet test
 ```
 
-### Responsibilities
-
-#### `Function.cs`
-
-* Lambda entry point
-* Request validation
-* Orchestrates cache lookup and Google API calls
-* Handles HTTP responses
-
-#### `GeocodeCacheRepository.cs`
-
-* Encapsulates all DynamoDB access
-* Implements cache read/write logic
-* TTL handling
-
-#### `GoogleGeocodeClient.cs`
-
-* Encapsulates Google Geocoding API integration
-* Responsible for external HTTP calls
-
-This structure allows **easy extension**, testing, and maintenance.
-
----
-
-## Configuration & Secrets
-
-Secrets and configuration are **never hard‑coded**.
-
-### Environment Variables
-
-| Variable              | Description              |
-| --------------------- | ------------------------ |
-| `GOOGLE_MAPS_API_KEY` | Google Geocoding API key |
-
-AWS credentials are provided via IAM Role attached to the Lambda function.
-
----
-
-## Logging & Observability
-
-* Uses **CloudWatch Logs** via `ILambdaContext.Logger`
-* Logs clearly indicate:
-
-  * Cache hits
-  * Cache misses
-  * External API calls
-
-This allows easy verification of cache behavior during runtime.
-
----
-
-## Error Handling
-
-* `400 Bad Request` → Missing or invalid address
-* `404 Not Found` → Address not resolved by Google
-* `502 Bad Gateway` → Google API failure
-* Defensive null checks throughout the pipeline
-
----
-
-## How to Run & Test
-
-1. Deploy Lambda using AWS tooling
-2. Configure environment variable `GOOGLE_MAPS_API_KEY`
-3. Call the endpoint with a U.S. address
-4. Call the same address again to verify cache hit
-5. Observe logs in CloudWatch
-
----
-
-## Enterprise Readiness Highlights
-
-✔ Separation of concerns
-✔ Cache-aside pattern
-✔ External API isolation
-✔ TTL-based caching
-✔ No hard-coded secrets
-✔ Clean, readable code
-✔ Easily extensible architecture
-
----
-
-## Future Improvements
-
-* Add unit tests for repository and client layers
-* Add structured logging (correlation IDs)
-* Support additional geocoding providers
-* Introduce API rate limiting
-
----
-
-## Author
-
-Built as a technical exercise showcasing **modern .NET, AWS serverless design, and enterprise-grade best practices**.
+Deploy function to AWS Lambda
+```
+    cd "AddressToCoordinatesLambda/src/AddressToCoordinatesLambda"
+    dotnet lambda deploy-function
+```
